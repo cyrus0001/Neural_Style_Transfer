@@ -8,7 +8,7 @@ Neural Style Transfer (NST) refers to a class of software algorithms that manipu
 <br> <!-- line break -->
 
 <div align="center">
-<img src="/Imgs/nst.png"/>
+<img src="/Images/nst.png"/>
 </div>
 
 <br> <!-- line break -->
@@ -26,7 +26,7 @@ Style transfer is a computer vision technique that takes two images — a "conte
 
 
 <div align="center">
-<img src="/Imgs/nst architecture.jpg" width="80%"/>
+<img src="/Images/nst architecture.jpg" width="80%"/>
 </div>
 
 <br> <!-- line break -->

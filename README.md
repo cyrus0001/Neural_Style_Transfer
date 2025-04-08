@@ -38,7 +38,7 @@ The ‘encoding nature’ of CNN’s is the key in Neural Style Transfer. Firstl
 
 
 <div align="center">
-<img src="/Imgs/final_oss.png" width="50%" />
+<img src="/Images/final_oss.png" width="50%" />
 </div>
 
 <br> <!-- line break -->

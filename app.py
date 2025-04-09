@@ -1,57 +1,57 @@
-import os
 import gradio as gr
-from fast_neural_style_transfer import fast_neural_style_transfer
-from classical_neural_style_transfer import classical_neural_style_transfer
+import numpy as np
 import tensorflow as tf
+import tensorflow_hub as hub
 from PIL import Image
-import tempfile
 
-def style_transfer_interface(content_imgs, style_img, model_type, custom_model_file=None, use_gpu=False):
-    # Restrict GPU if requested
-    if not use_gpu:
-        try:
-            tf.config.set_visible_devices([], 'GPU')
-        except:
-            pass
+# Check available GPU
+gpus = tf.config.list_physical_devices('GPU')
+gpu_available = len(gpus) > 0
 
-    results = []
-    model_path = os.path.abspath(custom_model_file.name) if custom_model_file else None
+# Load model from TF Hub
+model_path = "https://tfhub.dev/google/magenta/arbitrary-image-stylization-v1-256/2"
+print("Loading model from TensorFlow Hub...")
+hub_module = hub.load(model_path)
 
-    for content_img_path in content_imgs:
-        content_img = Image.open(content_img_path)
-        style_img_pil = Image.fromarray(style_img)
+# Preprocess image
+def preprocess_image(image):
+    image = np.array(image).astype(np.float32)[np.newaxis, ...] / 255.0
+    return image
 
-        if model_type == "Classic Neural Style Transfer":
-            # Save images temporarily for classical model which uses paths
-            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as c_img, \
-                 tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as s_img:
-                content_img.save(c_img.name)
-                style_img_pil.save(s_img.name)
-                result_array = classical_neural_style_transfer(c_img.name, s_img.name, iterations=1000)
-                result = Image.fromarray(result_array)
-        else:
-            result = fast_neural_style_transfer(content_img, style_img_pil, model_path)
+# Style Transfer Function with GPU Option
+def transfer_style_gradio(content_image, style_image, use_gpu):
+    content_image = preprocess_image(content_image)
+    style_image = preprocess_image(style_image)
+    style_image = tf.image.resize(style_image, (256, 256))
 
-        results.append(result)
+    # Device context
+    if use_gpu and gpu_available:
+        device = '/GPU:0'
+    else:
+        device = '/CPU:0'
 
-    return results if len(results) > 1 else results[0]
+    print(f"Running on: {device}")
 
-# Gradio UI
-interface = gr.Interface(
-    fn=style_transfer_interface,
+    with tf.device(device):
+        outputs = hub_module(tf.constant(content_image), tf.constant(style_image))
+        stylized_image = outputs[0]
+
+    # Convert output to image
+    stylized_image = tf.squeeze(stylized_image, axis=0)
+    stylized_image = (stylized_image * 255).numpy().astype(np.uint8)
+
+    return Image.fromarray(stylized_image)
+
+# Build Gradio Interface
+gr.Interface(
+    fn=transfer_style_gradio,
     inputs=[
-        gr.File(label="Upload Content Images", type="filepath", file_types=[".png", ".jpg", ".jpeg"], file_count="multiple"),
-        gr.Image(label="Style Image", type="numpy"),
-        gr.Radio(["Classic Neural Style Transfer", "Fast Neural Style Transfer"], label="Select Model"),
-        gr.File(label="Upload Custom TF Hub Model (.tar.gz or directory)", file_types=[".tar.gz", None]),
-        gr.Checkbox(label="Use GPU", value=True)
+        gr.Image(type="pil", label="Content Image"),
+        gr.Image(type="pil", label="Style Image"),
+        gr.Checkbox(label="Use GPU (if available)", value=True)
     ],
-    outputs=gr.Gallery(label="Stylized Output"),
-    title="🎨 Neural Style Transfer",
-    description="Upload one or more content images and a style image. Choose a model type, optionally upload a custom TF Hub model, and toggle GPU usage."
-)
-
-
-if __name__ == '__main__':
-    interface.launch(share=True)
-
+    outputs=gr.Image(label="Stylized Output"),
+    title="🎨 Neural Style Transfer with GPU Toggle",
+    description="Upload a content and style image. Choose whether to use GPU (if available).",
+    allow_flagging="never"
+).launch()
